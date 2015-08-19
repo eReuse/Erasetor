@@ -1,0 +1,422 @@
+#!/bin/bash
+
+# Compruebo el idioma por defecto del SO
+LANG=`echo $LANG | head -n 1 | cut -c1-2`
+
+# Declaración de directorios
+BIN_DIR="$( cd "$( dirname "$0" )" && pwd )"
+HOME_ERASETOR=`echo ${BIN_DIR} | sed -e 's/\/bin//g'`
+ETC_DIR=${HOME_ERASETOR}/etc
+
+# Contraseña GPG
+GPGpassphrase=(password_here)
+
+####################
+#	Config.ini     #
+####################
+variables() {
+	if [[ `cat $variables_file | grep -o DISC=N` == "DISC=N" ]]
+	then
+		DISC=N
+	elif [[ `cat $variables_file | grep -o DISC=1` == "DISC=1" ]]
+	then
+		DISC=1
+	elif [[ `cat $variables_file | grep -o DISC=2` == "DISC=2" ]]
+	then
+		DISC=2
+	else
+		DISC=Y
+	fi
+	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
+	then
+		ERASE=N
+	else
+		ERASE=Y
+	fi	
+	if [[ `cat $variables_file | grep -o EQUIP=1` == "EQUIP=1" ]]
+	then
+		EQUIP=1
+	elif [[ `cat $variables_file | grep -o EQUIP=2` == "EQUIP=2" ]]
+	then
+		EQUIP=2
+	elif [[ `cat $variables_file | grep -o EQUIP=3` == "EQUIP=3" ]]
+	then
+		EQUIP=3
+	elif [[ `cat $variables_file | grep -o EQUIP=4` == "EQUIP=4" ]]
+	then
+		EQUIP=4
+	elif [[ `cat $variables_file | grep -o EQUIP=5` == "EQUIP=5" ]]
+	then
+		EQUIP=5
+	elif [[ `cat $variables_file | grep -o EQUIP=6` == "EQUIP=6" ]]
+	then
+		EQUIP=6
+	else
+		EQUIP=0
+	fi
+	if [[ `cat $variables_file | grep -o DONOR=N` == "DONOR=N" ]]
+	then
+		DONOR=N
+	else
+		DONOR=Y
+	fi
+	if [[ `cat $variables_file | grep -o ID=N` == "ID=N" ]]
+	then
+		ID=N
+	else
+		ID=Y
+	fi
+	if [[ `cat $variables_file | grep -o TIME=Y` == "ID=Y" ]]
+	then
+		ID=Y
+	else
+		ID=N
+	fi
+	if [[ `cat $variables_file | grep -o LABEL=N` == "LABEL=N" ]]
+	then
+		LABEL=N
+	else
+		LABEL=Y
+	fi
+	if [[ `cat $variables_file | grep -o OBS=N` == "OBS=N" ]]
+	then
+		OBS=N
+	else
+		OBS=Y
+	fi
+	if [[ `cat $variables_file | grep -o SAVE=Y` == "SAVE=Y" ]]
+	then
+		SAVE=Y
+	else
+		SAVE=n
+	fi
+	if [[ `cat $variables_file | grep -o OFFLINE=N` == "OFFLINE=N" ]]
+	then
+		OFFLINE=N
+	else
+		OFFLINE=Y
+	fi
+	if [[ `cat $variables_file | grep -o MOVE=N` == "MOVE=N" ]]
+	then
+		MOVE=N
+	else
+		MOVE=Y
+	fi
+	if [[ `cat $variables_file | grep -o SENDTOSERVER=N` == "SENDTOSERVER=N" ]]
+	then
+		SENDTOSERVER=N
+	else
+		SENDTOSERVER=Y
+	fi
+}
+. /usr/share/donator/bin/disclist.sh
+DIRCONINI=`mount | grep $USB_ALM | awk '{print $3}'`
+if [ -e $DIRCONINI/config.ini ]
+then
+		variables_file="$DIRCONINI/config.ini"
+		variables
+else
+	variables_file="/usr/share/donator/etc/config.ini"
+	variables
+fi
+
+####################
+if [[ "$ERASE" == *Y* ]]; then
+	# Compruebo que existe el fichero con la traducción de los menús
+	# que corresponde al parámetro pasado.
+	if [ ! -f ${ETC_DIR}/menu_${1}.properties ]; then
+		if [ ! -f ${ETC_DIR}/menu_${LANG}.properties ]; then
+			# En caso de que no se haya pasado el parametro o la
+			# traducción no exista se muestra el uso del programa.
+			echo "Usage: erasetor [lang]"
+			echo "       lang: es/ca/en"
+			echo "       If no lang parameter, OS language is loaded"
+			exit 1
+		else
+			# Carga de los literales del menú en el idioma por
+			# defecto del SO
+			. ${ETC_DIR}/menu_${LANG}.properties
+		fi
+	else
+		# Carga de los literales del menú en el idioma pasado por
+		# parámetro.
+		. ${ETC_DIR}/menu_${1}.properties
+	fi
+
+	# Comprobación del usuario con el que se ha ejecutado la herramienta.
+	# Se necesitan permisos de root.
+	user=`whoami`
+	if [ $user != "root" ]; then
+		echo $permisos
+		exit 0
+	fi
+
+	# Splash screen del programa
+	tput clear
+	tput setaf 1
+	echo ""
+	echo ""
+	echo ""
+	echo "                                                 __                            "
+	echo "               ________________    ______  _____/  |_ ___________              "
+	echo "             _/ __ \\_  __ \\__  \\  /  ___/_/ __ \\   __|  _ \\_  __ \\             "
+	echo "             \\  ___/|  | \\// __ \\_\\___ \\ \\  ___/|  |(  <_> )  | \\/             "
+	echo "              \\___  >__|  (____  /____  > \\___  >__| \\____/|__|                "
+	echo "                  \\/           \\/     \\/      \\/                               "
+	echo ""
+	echo "$splash_1"
+	tput sgr0
+	tput cup 13 1
+	echo "$splash_2"
+	tput cup 13 49; echo "1"
+	sleep 1
+
+
+	# Variables por defecto.
+	choice="1"
+	pasadas="2"
+	discos=""
+
+	while [ $choice != "0" ]
+	do
+		# limpiar pantalla
+		tput clear
+
+		# Mostrar el nivel adecuado
+		if [ ${pasadas} -eq 2 ]; then
+			level=${level1}
+		else
+			level=${level2}
+		fi
+
+		# Mostramos el menú principal
+		tput cup 3 15
+		tput setaf 3
+		echo "$program"
+		tput sgr0
+		tput cup 5 17
+		tput rev
+		echo "$menu_1_title"
+		tput sgr0
+		tput cup 7 15
+		echo "$menu_1_1"
+		tput setaf 4
+		tput cup 8 20
+		echo "$menu_1_2 $discos_a_borrar"
+		tput sgr0
+		tput cup 10 15
+		echo "$menu_1_3"
+		tput setaf 4
+		tput cup 11 20
+		echo "$menu_1_4 $level"
+		tput sgr0
+		tput cup 13 15
+		tput setaf 1
+		echo "$menu_1_5"
+		tput sgr0
+		tput cup 15 35
+		echo "$menu_1_6"
+		tput sgr0
+		tput cup 17 15
+		tput bold
+
+		# Leemos la opción elegida del usuario
+		read -p "$menu_1_choice " choice
+
+		# Si se elige la opción 1 pasamos al menú de selección de discos
+		if [ $choice = "1" ]; then
+			choice2="1"
+			while [ $choice2 != "0" ]
+			do
+				fila=8
+				# limpiar pantalla
+				tput clear
+
+				# Mostramos el menú de selección de discos
+				tput cup 3 15
+				tput setaf 3
+				echo "$program"
+				tput sgr0
+				tput cup 5 17
+				tput rev
+				echo "$menu_2_title"
+				tput sgr0
+				tput cup 7 15
+				echo "$menu_2_1"
+				tput setaf 4
+
+				# Se detecta qué dispositivo se ha utilizado para el arranque (llave USB)
+				# para no mostrarlo en el menú de borrado.
+				usb=`mount | grep cdrom | awk {'print $1'} | sed -e "s/[0-9]//g"`
+
+				# Para cada disco del sistema mostramos una casilla marcada en caso
+				# de que se haya seleccionado para su borrado, la casilla se
+				# encuentra vacía por defecto.
+				for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
+				do
+					if [ "${i}" != "${usb}" ]; then
+						disc_huma=`fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | grep "${i}" | awk {'print $2" ("$3" "$4")"'} | sed -e "s/[:,]//g"`
+						tput cup $fila 20
+						nfila=`expr $fila - 7`
+						lista_discos[$nfila]=${i}
+						if [ `expr index "$discos" "$nfila"` -eq 0 ]; then
+							echo "[ ] `expr $fila - 7`. ${disc_huma}"
+						else
+							echo "[X] `expr $fila - 7`. ${disc_huma}"
+						fi
+						fila=`expr $fila + 1`
+					fi
+				done
+				tput sgr0
+				tput cup 15 35
+				echo "$menu_2_2"
+				tput sgr0
+				tput cup 17 15
+				tput bold
+
+				# Leemos la opción elegida del usuario
+				read -p "$menu_2_choice `expr $fila - 8`] " choice2
+
+				# Si no es cero, marcamos el disco elegido para su borrado en caso
+				# de que no estuviera marcado previamente. Si estaba marcado lo 
+				# desmarcamos.
+				if [ $choice2 != "0" ] && [ $choice2 -le ${#lista_discos[@]} ]; then
+					if [ `expr index "$discos" "$choice2"` -eq 0 ]; then
+						discos=${discos}$choice2
+					else
+						discos=${discos/$choice2}
+					fi
+				fi
+			done
+
+		# Si se elige la opción 2 pasamos al menú de selección de número de pasadas
+		elif [ $choice = "2" ]; then
+			# limpiar pantalla
+			tput clear
+
+			# Mostramos el menú de selección de número de pasadas
+			tput cup 3 15
+			tput setaf 3
+			echo "$program"
+			tput sgr0
+			tput cup 5 17
+			tput rev
+			echo "$menu_3_title"
+			tput sgr0
+			tput cup 7 15
+			echo "$menu_3_1"
+			tput sgr0
+			tput cup 9 15
+			tput setaf 1
+			echo "$menu_3_2"
+			tput cup 10 15
+			echo "$menu_3_3"
+			tput cup 11 15
+			echo "$menu_3_4"
+			tput cup 12 15
+			echo "$menu_3_5"
+
+			tput cup 14 15
+			echo "$menu_3_6"
+			tput cup 15 15
+			echo "$menu_3_7"
+			tput cup 16 15
+			echo "$menu_3_8"
+			tput cup 17 15
+			echo "$menu_3_9"
+			tput sgr0
+			tput cup 20 15
+			tput bold
+
+			# Leemos la opción elegida del usuario
+			read -p "$menu_3_choice " choice3
+
+			# Si la opción elegida es un número
+			if [ $choice3 -eq $choice3 2>/dev/null ]; then
+				# Si se elige la opción estándar se harán 3 pasadas (2 aleatorias + 1 de ceros)
+				if [ $choice3 -eq 1 ]; then
+					pasadas=2
+				# Si se eleige la opción paranoica se harán 7 pasadas (6 aleatorias + 1 de ceros)
+				elif [ $choice3 -eq 2 ]; then
+					pasadas=6
+				fi
+			fi
+
+		# Si se elige la opción 3 pasamos al menú de borrado
+		elif [ $choice = "3" ]; then
+			# limpiar pantalla
+			tput clear
+
+			# Mostramos el menú de borrado
+			tput cup 3 15
+			tput setaf 3
+			echo "$program"
+			tput sgr0
+			tput cup 5 17
+			tput rev
+			echo "$menu_4_title"
+			tput sgr0
+			tput cup 7 15
+			echo "$menu_4_1 $discos_a_borrar"
+			tput cup 9 15
+			echo "$menu_4_2 $level"
+			tput sgr0
+			tput cup 12 15
+			tput setaf 1
+			echo "$menu_4_3"
+			tput sgr0
+			tput cup 17 15
+			tput bold
+
+			# Leemos la opción elegida del usuario
+			read -p "$menu_4_choice " choice4
+
+			# Si elegi
+			clear
+			if [[ $choice4 = $si ]]; then
+				certs=0
+				gpg --batch --no-tty --yes --import /usr/share/donator/etc/key.bin 2>/dev/null
+				for j in $discos_a_borrar
+				do
+					# Genera la ruta/nombre del certificado.
+					device_name=`echo $j | cut -c6-8`
+					cert=/usr/share/donator/etc/$device_name.cert
+					# Empieza la cuenta para saber cuanto tiempo tarda.
+					STARTTIME=`date +%s`
+					# Indica el "mode" del erasetor
+					if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
+					# Borrado + importacion del certificado
+					shred -n $pasadas -v -z $j && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
+\n\t\t\t\t<duration>$ENDTIME</duration> \
+\n\t\t\t\t<mode>$e_mode</mode> \
+\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert
+					res=`expr $res + $?`
+				done
+				if [[ $res -eq 0 ]]; then
+					echo "${result_ok_1} ${discos_a_borrar} ${result_ok_2}"
+				else
+					echo "${result_ko_1} ${discos_a_borrar} ${result_ko_2}"
+				fi
+			else
+				echo "${cancel}"
+			fi
+			read -p "$continue " cont
+			exit 0
+		fi
+
+		# Recreamos la lista de discos a borrar para mostrarla de manera
+		# 'user friendly'
+		unset discos_a_borrar
+		for j in `seq 1 ${#lista_discos[@]}`
+		do
+			if [ `expr index "$discos" "$j"` -ne 0 ]
+			then
+				discos_a_borrar="$discos_a_borrar ${lista_discos[$j]}"
+			fi
+		done
+	done
+
+	tput clear
+	tput sgr0
+	tput rc
+fi
