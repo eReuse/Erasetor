@@ -1,4 +1,30 @@
 #!/bin/bash
+# Comprobación del usuario con el que se ha ejecutado la herramienta.
+# Se necesitan permisos de root.
+user=`whoami`
+if [ $user != "root" ]; then
+	echo $permisos
+	exit 0
+fi
+
+# GPG Passphrase
+GPGpassphrase=(password_here)
+
+# VAR KEY
+_key()
+{
+  IFS= read -r -s -n1 -d '' "${@:-_KEY}"
+}
+
+# EXIT TRAP
+function finish {
+	rm /tmp/*.stat &>/dev/null
+	tput sgr0
+	clear
+	echo -e "\n\n\tSelect what kind of register do you want do:" \
+	"\n\n\t-> 1. Register equipment mode\n\n\t-> 2. Erasetor mode"
+}
+trap finish EXIT
 
 # Compruebo el idioma por defecto del SO
 LANG=`echo $LANG | head -n 1 | cut -c1-2`
@@ -8,11 +34,7 @@ BIN_DIR="$( cd "$( dirname "$0" )" && pwd )"
 HOME_ERASETOR=`echo ${BIN_DIR} | sed -e 's/\/bin//g'`
 ETC_DIR=${HOME_ERASETOR}/etc
 
-# Contraseña GPG
-GPGpassphrase=(password_here)
-
-####################
-#	Config.ini     #
+#	Config.ini
 ####################
 variables() {
 	if [[ `cat $variables_file | grep -o DISC=N` == "DISC=N" ]]
@@ -143,39 +165,21 @@ if [[ "$ERASE" == *Y* ]]; then
 		. ${ETC_DIR}/menu_${1}.properties
 	fi
 
-	# Comprobación del usuario con el que se ha ejecutado la herramienta.
-	# Se necesitan permisos de root.
-	user=`whoami`
-	if [ $user != "root" ]; then
-		echo $permisos
-		exit 0
-	fi
-
-	# Splash screen del programa
-	tput clear
-	tput setaf 1
-	echo ""
-	echo ""
-	echo ""
-	echo "                                                 __                            "
-	echo "               ________________    ______  _____/  |_ ___________              "
-	echo "             _/ __ \\_  __ \\__  \\  /  ___/_/ __ \\   __|  _ \\_  __ \\             "
-	echo "             \\  ___/|  | \\// __ \\_\\___ \\ \\  ___/|  |(  <_> )  | \\/             "
-	echo "              \\___  >__|  (____  /____  > \\___  >__| \\____/|__|                "
-	echo "                  \\/           \\/     \\/      \\/                               "
-	echo ""
-	echo "$splash_1"
-	tput sgr0
-	tput cup 13 1
-	echo "$splash_2"
-	tput cup 13 49; echo "1"
-	sleep 1
-
-
 	# Variables por defecto.
 	choice="1"
-	pasadas="2"
+	pasadas="0"
 	discos=""
+	choice2=1
+	
+	# Seleccion por defecto de todos los discos
+	for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
+	do
+		if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]] ; then
+			discos_a_borrar="${discos_a_borrar} $i"
+			discos=${discos}$choice2
+		fi
+		choice2=$((choice2+1))
+	done
 
 	while [ $choice != "0" ]
 	do
@@ -183,7 +187,9 @@ if [[ "$ERASE" == *Y* ]]; then
 		tput clear
 
 		# Mostrar el nivel adecuado
-		if [ ${pasadas} -eq 2 ]; then
+		if [ ${pasadas} -eq 0 ]; then
+			level=${level0}
+		elif [ ${pasadas} -eq 2 ]; then
 			level=${level1}
 		else
 			level=${level2}
@@ -221,7 +227,9 @@ if [[ "$ERASE" == *Y* ]]; then
 		tput bold
 
 		# Leemos la opción elegida del usuario
-		read -p "$menu_1_choice " choice
+		echo -n "$menu_1_choice " 
+		_key
+		choice=$_KEY
 
 		# Si se elige la opción 1 pasamos al menú de selección de discos
 		if [ $choice = "1" ]; then
@@ -275,8 +283,11 @@ if [[ "$ERASE" == *Y* ]]; then
 				tput bold
 
 				# Leemos la opción elegida del usuario
-				read -p "$menu_2_choice `expr $fila - 8`] " choice2
-
+				echo -n "$menu_2_choice `expr $fila - 8`] "
+				
+				_key
+				choice2=$_KEY
+				
 				# Si no es cero, marcamos el disco elegido para su borrado en caso
 				# de que no estuviera marcado previamente. Si estaba marcado lo 
 				# desmarcamos.
@@ -308,36 +319,47 @@ if [[ "$ERASE" == *Y* ]]; then
 			tput sgr0
 			tput cup 9 15
 			tput setaf 1
-			echo "$menu_3_2"
+			echo "$menu_3_2_1"
 			tput cup 10 15
-			echo "$menu_3_3"
-			tput cup 11 15
-			echo "$menu_3_4"
+			tput setaf 1
+			echo "$menu_3_2_2"
 			tput cup 12 15
+			tput setaf 1
+			echo "$menu_3_2"
+			tput cup 13 15
+			echo "$menu_3_3"
+			tput cup 14 15
+			echo "$menu_3_4"
+			tput cup 15 15
 			echo "$menu_3_5"
 
-			tput cup 14 15
-			echo "$menu_3_6"
-			tput cup 15 15
-			echo "$menu_3_7"
-			tput cup 16 15
-			echo "$menu_3_8"
 			tput cup 17 15
+			echo "$menu_3_6"
+			tput cup 18 15
+			echo "$menu_3_7"
+			tput cup 19 15
+			echo "$menu_3_8"
+			tput cup 20 15
 			echo "$menu_3_9"
 			tput sgr0
-			tput cup 20 15
+			tput cup 22 15
 			tput bold
 
 			# Leemos la opción elegida del usuario
-			read -p "$menu_3_choice " choice3
+			
+			echo -n "$menu_3_choice "
+			_key
+			choice3=$_KEY
 
 			# Si la opción elegida es un número
 			if [ $choice3 -eq $choice3 2>/dev/null ]; then
 				# Si se elige la opción estándar se harán 3 pasadas (2 aleatorias + 1 de ceros)
 				if [ $choice3 -eq 1 ]; then
+					pasadas=0
+				elif [ $choice3 -eq 2 ]; then
 					pasadas=2
 				# Si se eleige la opción paranoica se harán 7 pasadas (6 aleatorias + 1 de ceros)
-				elif [ $choice3 -eq 2 ]; then
+				elif [ $choice3 -eq 3 ]; then
 					pasadas=6
 				fi
 			fi
@@ -369,7 +391,9 @@ if [[ "$ERASE" == *Y* ]]; then
 			tput bold
 
 			# Leemos la opción elegida del usuario
-			read -p "$menu_4_choice " choice4
+			echo -n "$menu_4_choice "
+			_key
+			choice4=$_KEY
 
 			# Si elegi
 			clear
@@ -386,12 +410,53 @@ if [[ "$ERASE" == *Y* ]]; then
 					# Indica el "mode" del erasetor
 					if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
 					# Borrado + importacion del certificado
-					shred -n $pasadas -v -z $j && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
+					disk=`echo $j | cut -c 6-`
+					(sudo shred -n $pasadas -v -z $j &> /tmp/$disk.stat && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
 \n\t\t\t\t<duration>$ENDTIME</duration> \
 \n\t\t\t\t<mode>$e_mode</mode> \
-\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert
+\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert &) 
+					GPGpassphrase=0
 					res=`expr $res + $?`
 				done
+				clear
+				# SHOW ERRASETOR PROCESS #
+				
+				step=1
+				disk_final=0
+				while [[ $disk_final == 0 ]]
+				do
+					fila=4
+					sleep 2
+					disk_done=0
+					for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1 | cut -c 6-`
+					do
+						tput civis
+						if [ -r /tmp/$i.stat ]; then
+							tput cup $fila 10
+							tput sgr0
+							if [[ $i == sd? ]] || [[ $i == hd? ]]; then
+								echo -e "Model: \033[1m"`hdparm -I /dev/$i | grep 'Model\ Number' | cut -c 22-`"\e[0m \tSerial: \033[1m"`hdparm -I /dev/$i | grep 'Serial\ Number' | cut -c 22-`"\e[0m"
+							fi
+							tput cup $((fila+1)) 5
+							if [[ `tail -qn 1 /tmp/$i.stat | rev | cut -c -4 | rev` == "100%" ]] && [[ `tail -qn 1 /tmp/$i.stat | grep -o "pass $(($pasadas+1))/$(($pasadas+1))"` == "pass $(($pasadas+1))/$(($pasadas+1))" ]]; then
+								echo -e "\e[0;32m"`tail -1 /tmp/$i.stat`"\e[0m"
+								disk_done=$((disk_done+1))
+							else
+								echo -e `tail -1 /tmp/$i.stat`"			"
+							fi
+							fila=$((fila+3))
+						fi
+					done
+					if [[ $disk_done == `ls /tmp/*.stat 2>/dev/null | wc -l` ]]
+					then
+						disk_final=1
+						# Space when finish
+						echo -e "\n"
+					fi
+				done
+				rm /tmp/*.stat &>/dev/null
+				## ## ## ## ## ## ## ## ##
+				
 				if [[ $res -eq 0 ]]; then
 					echo "${result_ok_1} ${discos_a_borrar} ${result_ok_2}"
 				else
@@ -400,7 +465,10 @@ if [[ "$ERASE" == *Y* ]]; then
 			else
 				echo "${cancel}"
 			fi
-			read -p "$continue " cont
+			echo -n "$continue "
+			_key
+			cont=$_KEY
+
 			exit 0
 		fi
 
