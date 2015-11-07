@@ -26,6 +26,8 @@ function finish {
 }
 trap finish EXIT
 
+
+
 # Compruebo el idioma por defecto del SO
 LANG=`echo $LANG | head -n 1 | cut -c1-2`
 
@@ -33,114 +35,6 @@ LANG=`echo $LANG | head -n 1 | cut -c1-2`
 BIN_DIR="$( cd "$( dirname "$0" )" && pwd )"
 HOME_ERASETOR=`echo ${BIN_DIR} | sed -e 's/\/bin//g'`
 ETC_DIR=${HOME_ERASETOR}/etc
-
-#	Config.ini
-####################
-variables() {
-	if [[ `cat $variables_file | grep -o DISC=N` == "DISC=N" ]]
-	then
-		DISC=N
-	elif [[ `cat $variables_file | grep -o DISC=1` == "DISC=1" ]]
-	then
-		DISC=1
-	elif [[ `cat $variables_file | grep -o DISC=2` == "DISC=2" ]]
-	then
-		DISC=2
-	else
-		DISC=Y
-	fi
-	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
-	then
-		ERASE=N
-	else
-		ERASE=Y
-	fi	
-	if [[ `cat $variables_file | grep -o EQUIP=1` == "EQUIP=1" ]]
-	then
-		EQUIP=1
-	elif [[ `cat $variables_file | grep -o EQUIP=2` == "EQUIP=2" ]]
-	then
-		EQUIP=2
-	elif [[ `cat $variables_file | grep -o EQUIP=3` == "EQUIP=3" ]]
-	then
-		EQUIP=3
-	elif [[ `cat $variables_file | grep -o EQUIP=4` == "EQUIP=4" ]]
-	then
-		EQUIP=4
-	elif [[ `cat $variables_file | grep -o EQUIP=5` == "EQUIP=5" ]]
-	then
-		EQUIP=5
-	elif [[ `cat $variables_file | grep -o EQUIP=6` == "EQUIP=6" ]]
-	then
-		EQUIP=6
-	else
-		EQUIP=0
-	fi
-	if [[ `cat $variables_file | grep -o DONOR=N` == "DONOR=N" ]]
-	then
-		DONOR=N
-	else
-		DONOR=Y
-	fi
-	if [[ `cat $variables_file | grep -o ID=N` == "ID=N" ]]
-	then
-		ID=N
-	else
-		ID=Y
-	fi
-	if [[ `cat $variables_file | grep -o TIME=Y` == "ID=Y" ]]
-	then
-		ID=Y
-	else
-		ID=N
-	fi
-	if [[ `cat $variables_file | grep -o LABEL=N` == "LABEL=N" ]]
-	then
-		LABEL=N
-	else
-		LABEL=Y
-	fi
-	if [[ `cat $variables_file | grep -o OBS=N` == "OBS=N" ]]
-	then
-		OBS=N
-	else
-		OBS=Y
-	fi
-	if [[ `cat $variables_file | grep -o SAVE=Y` == "SAVE=Y" ]]
-	then
-		SAVE=Y
-	else
-		SAVE=n
-	fi
-	if [[ `cat $variables_file | grep -o OFFLINE=N` == "OFFLINE=N" ]]
-	then
-		OFFLINE=N
-	else
-		OFFLINE=Y
-	fi
-	if [[ `cat $variables_file | grep -o MOVE=N` == "MOVE=N" ]]
-	then
-		MOVE=N
-	else
-		MOVE=Y
-	fi
-	if [[ `cat $variables_file | grep -o SENDTOSERVER=N` == "SENDTOSERVER=N" ]]
-	then
-		SENDTOSERVER=N
-	else
-		SENDTOSERVER=Y
-	fi
-}
-. /usr/share/donator/bin/disclist.sh
-DIRCONINI=`mount | grep $USB_ALM | awk '{print $3}'`
-if [ -e $DIRCONINI/config.ini ]
-then
-		variables_file="$DIRCONINI/config.ini"
-		variables
-else
-	variables_file="/usr/share/donator/etc/config.ini"
-	variables
-fi
 
 ####################
 if [[ "$ERASE" == *Y* ]]; then
@@ -165,13 +59,36 @@ if [[ "$ERASE" == *Y* ]]; then
 		. ${ETC_DIR}/menu_${1}.properties
 	fi
 
-	# Variables por defecto.
-	choice="1"
-	pasadas="0"
-	discos=""
-	choice2=1
-	
-	# Seleccion por defecto de todos los discos
+	# VAR and funcions
+config_ini() {
+	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
+	then
+		ERASE=N
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=1" ]]
+	then
+		ERASE=1
+		pasadas="0"
+		select_all
+		erasetor_steps
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=2" ]]
+	then
+		ERASE=2
+		pasadas="2"
+		select_all
+		erasetor_steps
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=3" ]]
+	then
+		ERASE=3
+		pasadas="6"	
+		select_all	
+		erasetor_steps		
+	else
+		ERASE=Y
+		pasadas="0"
+	fi	
+}
+select_all() {
+
 	for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
 	do
 		if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]] ; then
@@ -183,6 +100,88 @@ if [[ "$ERASE" == *Y* ]]; then
 
 	while [ $choice != "0" ]
 	do
+}
+erasetor_steps() {
+clear
+	if [[ $choice4 = $si ]]; then
+		certs=0
+		gpg --batch --no-tty --yes --import /usr/share/donator/etc/key.bin 2>/dev/null
+		for j in $discos_a_borrar
+		do
+			# Genera la ruta/nombre del certificado.
+			device_name=`echo $j | cut -c6-8`
+			cert=/usr/share/donator/etc/$device_name.cert
+			# Empieza la cuenta para saber cuanto tiempo tarda.
+			STARTTIME=`date +%s`
+			# Indica el "mode" del erasetor
+			if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
+			# Borrado + importacion del certificado
+			disk=`echo $j | cut -c 6-`
+			(sudo shred -n $pasadas -v -z $j &> /tmp/$disk.stat && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
+\n\t\t\t\t<duration>$ENDTIME</duration> \
+\n\t\t\t\t<mode>$e_mode</mode> \
+\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert &) 
+			GPGpassphrase=0
+			res=`expr $res + $?`
+		done
+		clear
+		# SHOW ERRASETOR PROCESS #
+		
+		step=1
+		disk_final=0
+		while [[ $disk_final == 0 ]]
+		do
+			fila=4
+			sleep 2
+			disk_done=0
+			for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1 | cut -c 6-`
+			do
+				tput civis
+				if [ -r /tmp/$i.stat ]; then
+					tput cup $fila 10
+					tput sgr0
+					if [[ $i == sd? ]] || [[ $i == hd? ]]; then
+						echo -e "Model: \033[1m"`hdparm -I /dev/$i | grep 'Model\ Number' | cut -c 22-`"\e[0m \tSerial: \033[1m"`hdparm -I /dev/$i | grep 'Serial\ Number' | cut -c 22-`"\e[0m"
+					fi
+					tput cup $((fila+1)) 5
+					if [[ `tail -qn 1 /tmp/$i.stat | rev | cut -c -4 | rev` == "100%" ]] && [[ `tail -qn 1 /tmp/$i.stat | grep -o "pass $(($pasadas+1))/$(($pasadas+1))"` == "pass $(($pasadas+1))/$(($pasadas+1))" ]]; then
+						echo -e "\e[0;32m"`tail -1 /tmp/$i.stat`"\e[0m"
+						disk_done=$((disk_done+1))
+					else
+						echo -e `tail -1 /tmp/$i.stat`"			"
+					fi
+					fila=$((fila+3))
+				fi
+			done
+			if [[ $disk_done == `ls /tmp/*.stat 2>/dev/null | wc -l` ]]
+			then
+				disk_final=1
+				# Space when finish
+				echo -e "\n"
+			fi
+		done
+		rm /tmp/*.stat &>/dev/null
+}
+	choice="1"
+	discos=""
+	choice2=1
+	
+	# Seleccion por defecto de todos los discos
+select_all()
+
+#  Read Config.ini
+####################
+
+. /usr/share/donator/bin/disclist.sh
+DIRCONINI=`mount | grep $USB_ALM | awk '{print $3}'`
+if [ -e $DIRCONINI/config.ini ]
+then
+		variables_file="$DIRCONINI/config.ini"
+		config_ini
+else
+	variables_file="/usr/share/donator/etc/config.ini"
+	config_ini
+fi
 		# limpiar pantalla
 		tput clear
 
@@ -396,65 +395,7 @@ if [[ "$ERASE" == *Y* ]]; then
 			choice4=$_KEY
 
 			# Si elegi
-			clear
-			if [[ $choice4 = $si ]]; then
-				certs=0
-				gpg --batch --no-tty --yes --import /usr/share/donator/etc/key.bin 2>/dev/null
-				for j in $discos_a_borrar
-				do
-					# Genera la ruta/nombre del certificado.
-					device_name=`echo $j | cut -c6-8`
-					cert=/usr/share/donator/etc/$device_name.cert
-					# Empieza la cuenta para saber cuanto tiempo tarda.
-					STARTTIME=`date +%s`
-					# Indica el "mode" del erasetor
-					if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
-					# Borrado + importacion del certificado
-					disk=`echo $j | cut -c 6-`
-					(sudo shred -n $pasadas -v -z $j &> /tmp/$disk.stat && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
-\n\t\t\t\t<duration>$ENDTIME</duration> \
-\n\t\t\t\t<mode>$e_mode</mode> \
-\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert &) 
-					GPGpassphrase=0
-					res=`expr $res + $?`
-				done
-				clear
-				# SHOW ERRASETOR PROCESS #
-				
-				step=1
-				disk_final=0
-				while [[ $disk_final == 0 ]]
-				do
-					fila=4
-					sleep 2
-					disk_done=0
-					for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1 | cut -c 6-`
-					do
-						tput civis
-						if [ -r /tmp/$i.stat ]; then
-							tput cup $fila 10
-							tput sgr0
-							if [[ $i == sd? ]] || [[ $i == hd? ]]; then
-								echo -e "Model: \033[1m"`hdparm -I /dev/$i | grep 'Model\ Number' | cut -c 22-`"\e[0m \tSerial: \033[1m"`hdparm -I /dev/$i | grep 'Serial\ Number' | cut -c 22-`"\e[0m"
-							fi
-							tput cup $((fila+1)) 5
-							if [[ `tail -qn 1 /tmp/$i.stat | rev | cut -c -4 | rev` == "100%" ]] && [[ `tail -qn 1 /tmp/$i.stat | grep -o "pass $(($pasadas+1))/$(($pasadas+1))"` == "pass $(($pasadas+1))/$(($pasadas+1))" ]]; then
-								echo -e "\e[0;32m"`tail -1 /tmp/$i.stat`"\e[0m"
-								disk_done=$((disk_done+1))
-							else
-								echo -e `tail -1 /tmp/$i.stat`"			"
-							fi
-							fila=$((fila+3))
-						fi
-					done
-					if [[ $disk_done == `ls /tmp/*.stat 2>/dev/null | wc -l` ]]
-					then
-						disk_final=1
-						# Space when finish
-						echo -e "\n"
-					fi
-				done
-				rm /tmp/*.stat &>/dev/null
+			erasetor_steps
 				## ## ## ## ## ## ## ## ##
 				
 				if [[ $res -eq 0 ]]; then
