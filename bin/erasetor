@@ -2,19 +2,14 @@
 # Comprobación del usuario con el que se ha ejecutado la herramienta.
 # Se necesitan permisos de root.
 user=`whoami`
-if [ $user != "root" ]; then
+if [ $user != "root" ];
+then
 	echo $permisos
 	exit 0
 fi
 
 # GPG Passphrase
-GPGpassphrase=(password_here)
-
-# VAR KEY
-_key()
-{
-  IFS= read -r -s -n1 -d '' "${@:-_KEY}"
-}
+GPG_passphrase=password
 
 # EXIT TRAP
 function finish {
@@ -58,70 +53,47 @@ if [[ "$ERASE" == *Y* ]]; then
 		# parámetro.
 		. ${ETC_DIR}/menu_${1}.properties
 	fi
+fi
 
 	# VAR and funcions
-config_ini() {
-	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
-	then
-		ERASE=N
-	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=1" ]]
-	then
-		ERASE=1
-		pasadas="0"
-		select_all
-		erasetor_steps
-	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=2" ]]
-	then
-		ERASE=2
-		pasadas="2"
-		select_all
-		erasetor_steps
-	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=3" ]]
-	then
-		ERASE=3
-		pasadas="6"	
-		select_all	
-		erasetor_steps		
-	else
-		ERASE=Y
-		pasadas="0"
-	fi	
-}
+	pasadas="0"
+	choice="1"
+	discos=""
+	choice2=1
 select_all() {
-
 	for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
-	do
-		if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]] ; then
+	do if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]]
+		then
 			discos_a_borrar="${discos_a_borrar} $i"
 			discos=${discos}$choice2
 		fi
 		choice2=$((choice2+1))
 	done
-
-	while [ $choice != "0" ]
-	do
 }
 erasetor_steps() {
 clear
-	if [[ $choice4 = $si ]]; then
 		certs=0
 		gpg --batch --no-tty --yes --import /usr/share/donator/etc/key.bin 2>/dev/null
 		for j in $discos_a_borrar
-		do
 			# Genera la ruta/nombre del certificado.
-			device_name=`echo $j | cut -c6-8`
+		do device_name=`echo $j | cut -c6-8`
 			cert=/usr/share/donator/etc/$device_name.cert
 			# Empieza la cuenta para saber cuanto tiempo tarda.
 			STARTTIME=`date +%s`
 			# Indica el "mode" del erasetor
-			if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
+			if [ "$pasadas" == "2" ]; then
+				e_mode=1
+			fi
+			if [ "$pasadas" == "6" ]; then
+				e_mode=2
+			fi
 			# Borrado + importacion del certificado
 			disk=`echo $j | cut -c 6-`
 			(sudo shred -n $pasadas -v -z $j &> /tmp/$disk.stat && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
 \n\t\t\t\t<duration>$ENDTIME</duration> \
 \n\t\t\t\t<mode>$e_mode</mode> \
-\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert &) 
-			GPGpassphrase=0
+\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPG_passphrase --sign 2>/dev/null >$cert &) 
+			GPG_passphrase=0
 			res=`expr $res + $?`
 		done
 		clear
@@ -140,11 +112,13 @@ clear
 				if [ -r /tmp/$i.stat ]; then
 					tput cup $fila 10
 					tput sgr0
-					if [[ $i == sd? ]] || [[ $i == hd? ]]; then
+					if [[ $i == sd? ]] || [[ $i == hd? ]]
+					then
 						echo -e "Model: \033[1m"`hdparm -I /dev/$i | grep 'Model\ Number' | cut -c 22-`"\e[0m \tSerial: \033[1m"`hdparm -I /dev/$i | grep 'Serial\ Number' | cut -c 22-`"\e[0m"
 					fi
 					tput cup $((fila+1)) 5
-					if [[ `tail -qn 1 /tmp/$i.stat | rev | cut -c -4 | rev` == "100%" ]] && [[ `tail -qn 1 /tmp/$i.stat | grep -o "pass $(($pasadas+1))/$(($pasadas+1))"` == "pass $(($pasadas+1))/$(($pasadas+1))" ]]; then
+					if [[ `tail -qn 1 /tmp/$i.stat | rev | cut -c -4 | rev` == "100%" ]] && [[ `tail -qn 1 /tmp/$i.stat | grep -o "pass $(($pasadas+1))/$(($pasadas+1))"` == "pass $(($pasadas+1))/$(($pasadas+1))" ]]
+					then
 						echo -e "\e[0;32m"`tail -1 /tmp/$i.stat`"\e[0m"
 						disk_done=$((disk_done+1))
 					else
@@ -162,9 +136,37 @@ clear
 		done
 		rm /tmp/*.stat &>/dev/null
 }
-	choice="1"
-	discos=""
-	choice2=1
+config_ini() {
+	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
+	then
+		ERASE=N
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=1" ]]
+	then
+		ERASE=1
+		pasadas="0"
+		select_all
+		erasetor_steps
+		exit
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=2" ]]
+	then
+		ERASE=2
+		pasadas="2"
+		select_all
+		erasetor_steps
+		exit
+	elif [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=3" ]]
+	then
+		ERASE=3
+		pasadas="6"	
+		select_all	
+		erasetor_steps	
+		exit	
+	else
+		ERASE=Y
+		pasadas="0"
+	fi	
+}
+
 	
 	# Seleccion por defecto de todos los discos
 select_all()
@@ -182,6 +184,13 @@ else
 	variables_file="/usr/share/donator/etc/config.ini"
 	config_ini
 fi
+
+# VAR KEY
+_key()
+{
+  IFS= read -r -s -n1 -d '' "${@:-_KEY}"
+}
+
 		# limpiar pantalla
 		tput clear
 
