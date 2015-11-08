@@ -14,47 +14,16 @@ LANG=`echo $LANG | head -n 1 | cut -c1-2`
 BIN_DIR="$( cd "$( dirname "$0" )" && pwd )"
 HOME_ERASETOR=`echo ${BIN_DIR} | sed -e 's/\/bin//g'`
 ETC_DIR=${HOME_ERASETOR}/etc
-
 #	Variables
 ####################
-gpg_password=""
+GPGpassphrase="password"
 choice="1"
 pasadas="0"
 discos=""
 choice2=1
 
-#	Function
+#	Functions
 ####################
-_key()
-{
-  IFS= read -r -s -n1 -d '' "${@:-_KEY}"
-}
-
-variables() {
-	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
-	then
-		ERASE=N
-	elif [[ `cat $variables_file | grep -o ERASE=1` == "ERASE=1" ]]
-	then
-		ERASE=1
-		pasadas="0"
-		select_disks
-		erasetor_steps
-		exit
-	else
-		ERASE=Y
-	fi
-}
-select_disks() {
-	for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
-	do
-		if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]] ; then
-			discos_a_borrar="${discos_a_borrar} $i"
-			discos=${discos}$choice2
-		fi
-		choice2=$((choice2+1))
-	done
-}
 erasetor_steps() {
 	certs=0
 	gpg --batch --no-tty --yes --import /usr/share/donator/etc/key.bin 2>/dev/null
@@ -66,19 +35,19 @@ erasetor_steps() {
 		# Empieza la cuenta para saber cuanto tiempo tarda.
 		STARTTIME=`date +%s`
 		# Indica el "mode" del erasetor
-		if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2;fi
+		if [[ $pasadas == 2 ]];then e_mode=1 ; elif [[ $pasadas == 6 ]];then e_mode=2; elif [[ $pasadas == 0 ]];then e_mode=3;fi
 		# Borrado + importacion del certificado
 		disk=`echo $j | cut -c 6-`
 		(sudo shred -n $pasadas -v -z $j &> /tmp/$disk.stat && ENDTIME=$((`date +%s`-$STARTTIME)) && echo "\n\t\t\t<erasetor> \
-	\n\t\t\t\t<duration>$ENDTIME</duration> \
-	\n\t\t\t\t<mode>$e_mode</mode> \
-	\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $gpg_password --sign 2>/dev/null >$cert &) 
-		gpg_password=0
+\n\t\t\t\t<duration>$ENDTIME</duration> \
+\n\t\t\t\t<mode>$e_mode</mode> \
+\n\t\t\t</erasetor>" | gpg --batch --no-tty --passphrase $GPGpassphrase --sign 2>/dev/null >$cert &) 
+		GPGpassphrase=0
 		res=`expr $res + $?`
 	done
 	clear
 	# SHOW ERRASETOR PROCESS #
-
+	
 	step=1
 	disk_final=0
 	while [[ $disk_final == 0 ]]
@@ -114,19 +83,57 @@ erasetor_steps() {
 	done
 	rm /tmp/*.stat &>/dev/null
 	## ## ## ## ## ## ## ## ##
-
-	if [[ $res -eq 0 ]]
-	then
+	
+	if [[ $res -eq 0 ]]; then
 		echo "${result_ok_1} ${discos_a_borrar} ${result_ok_2}"
 	else
 		echo "${result_ko_1} ${discos_a_borrar} ${result_ko_2}"
 	fi
-	echo -n "$continue "
-	_key
-	cont=$_KEY
-
-	exit 0
 }
+select_disks() {
+	for i in `fdisk -l 2>/dev/null | egrep "Disco \/|Disk \/|Disc \/" | cut -d " " -f 2 | cut -d ":" -f 1`
+	do
+		if [[ $i == /dev/sd? ]] || [[ $i == /dev/hd? ]] && [[ $i != `echo $USB_LIVE | cut -c 1-8` ]] ; then
+			discos_a_borrar="${discos_a_borrar} $i"
+			discos=${discos}$choice2
+		fi
+		choice2=$((choice2+1))
+	done
+}
+variables() {
+	if [[ `cat $variables_file | grep -o ERASE=N` == "ERASE=N" ]]
+	then
+		ERASE=N
+	elif [[ `cat $variables_file | grep -o ERASE=1` == "ERASE=1" ]]
+	then
+		pasadas="0"
+		ERASE=1
+		select_disks
+		erasetor_steps
+		exit 0
+	elif [[ `cat $variables_file | grep -o ERASE=3` == "ERASE=3" ]]
+	then
+		pasadas="2"
+		ERASE=1
+		select_disks
+		erasetor_steps
+		exit 0
+	elif [[ `cat $variables_file | grep -o ERASE=7` == "ERASE=7" ]]
+	then
+		pasadas="6"
+		ERASE=1
+		select_disks
+		erasetor_steps
+		exit 0
+	else
+		ERASE=Y
+	fi	
+}
+_key()
+{
+  IFS= read -r -s -n1 -d '' "${@:-_KEY}"
+}
+
 function finish {
 	rm /tmp/*.stat &>/dev/null
 	tput sgr0
@@ -135,9 +142,8 @@ function finish {
 	"\n\n\t-> 1. Register equipment mode\n\n\t-> 2. Erasetor mode"
 }
 trap finish EXIT
-
-##
-####################
+########
+########
 . /usr/share/donator/bin/disclist.sh
 DIRCONINI=`mount | grep $USB_ALM | awk '{print $3}'`
 if [ -e $DIRCONINI/config.ini ]
@@ -391,8 +397,16 @@ if [[ "$ERASE" == *Y* ]]; then
 
 			# Si elegi
 			clear
-		if [[ $choice4 = $si ]]; then
-			erasetor_steps	
+			if [[ $choice4 = $si ]]; then
+				erasetor_steps
+			else
+				echo "${cancel}"
+			fi
+			echo -n "$continue "
+			_key
+			cont=$_KEY
+
+			exit 0
 		fi
 
 		# Recreamos la lista de discos a borrar para mostrarla de manera
