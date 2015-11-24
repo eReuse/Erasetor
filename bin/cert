@@ -1,0 +1,26 @@
+#!/usr/bin/env python
+import time, os, sys, fcntl, struct
+
+# checking priveleges
+#if os.geteuid() !=  0:
+#    print("ERROR: Must be root to export certificates")
+#    sys.exit(1)
+    
+# Variables
+hardware = dict()
+dir = "/home/adria/GitHub/Donator/etc"
+dirs = os.listdir(dir)
+cert = ".cert"
+
+# Function definition
+#def get_serial():
+
+# FOR every certificate, do...
+for file in dirs:
+	if file.endswith(cert):
+		hardware['cert'] = dir + "/" + file
+		hardware['device'] = "/dev/" + file[:3]
+		hardware['timestamp'] = time.strftime("%Y-%m-%d %H:%M:%S")
+
+# Program
+		print(hardware)
