@@ -13,14 +13,20 @@ dirs = os.listdir(dir)
 cert = ".cert"
 
 # Function definition
+def get_cert(x):
+	return dir + "/" + x
+def get_deive(x):
+	return "/dev/" + x[:3]
+def get_timestamp():
+	return time.strftime("%Y-%m-%d %H:%M:%S")
 #def get_serial():
 
 # FOR every certificate, do...
 for file in dirs:
 	if file.endswith(cert):
-		hardware['cert'] = dir + "/" + file
-		hardware['device'] = "/dev/" + file[:3]
-		hardware['timestamp'] = time.strftime("%Y-%m-%d %H:%M:%S")
+		hardware['cert'] =  get_cert(file)
+		hardware['device'] = get_deive(file)
+		hardware['timestamp'] = get_timestamp()
 
 # Program
 		print(hardware)
